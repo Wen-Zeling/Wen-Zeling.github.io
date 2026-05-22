@@ -197,6 +197,13 @@ ul {
   font-size: clamp(2.4rem, 6vw, 5.2rem);
 }
 
+.hero h1 span {
+  color: var(--color-muted);
+  font-family: var(--font-main);
+  font-size: clamp(1.5rem, 3vw, 2.8rem);
+  font-weight: 600;
+}
+
 .hero-lead {
   max-width: 680px;
   color: var(--color-muted);
@@ -214,8 +221,9 @@ ul {
 
 .profile-card img {
   width: 100%;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
+  object-position: center;
 }
 
 .profile-body {
@@ -265,6 +273,34 @@ ul {
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.72);
   padding: 1.2rem;
+}
+
+.item-link {
+  display: block;
+  color: var(--color-text);
+  text-decoration: none;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease;
+}
+
+.item-link:hover {
+  border-color: rgba(39, 95, 143, 0.48);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  color: var(--color-text);
+  transform: translateY(-2px) scale(1.012);
+}
+
+.item-link:focus-visible {
+  outline: 3px solid rgba(39, 95, 143, 0.28);
+  outline-offset: 3px;
+}
+
+.item-link h3 {
+  color: var(--color-accent);
 }
 
 .item h3 {

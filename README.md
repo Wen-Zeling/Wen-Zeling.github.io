@@ -8,6 +8,8 @@ Personal academic homepage built with plain HTML and CSS for GitHub Pages.
 - `publications.html` - publications
 - `projects.html` - projects
 - `thoughts.html` - learning notes and reflections
+- `blogs/` - standalone blog note pages
+- `assets/papers/` - paper PDF files
 
 ## Local Preview
 

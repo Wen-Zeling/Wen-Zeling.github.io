@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="记录 Franka Panda 真机运行、libfranka/pybind11 控制接口以及 GELLO 遥操作软件配置过程。">
+    <title>Franka Panda 与 GELLO 遥操作软件记录 | 文泽凌 Wen Zeling</title>
+    <link rel="stylesheet" href="../assets/css/styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="site-brand" href="../index.html">文泽凌 Wen Zeling</a>
+        <nav class="site-nav" aria-label="主导航">
+          <a href="../index.html">关于我</a>
+          <a href="../publications.html">发表</a>
+          <a href="../projects.html">项目</a>
+          <a href="../thoughts.html" aria-current="page">学习思考</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page-main">
+      <div class="container post-shell">
+        <aside class="post-toc" aria-label="文章目录">
+          <div class="post-toc-heading">
+            <span class="post-toc-icon" aria-hidden="true"></span>
+            <span>目录</span>
+            <button class="post-toc-toggle" type="button" aria-expanded="true" aria-controls="post-toc-list">收起</button>
+          </div>
+          <nav id="post-toc-list" class="post-toc-list">
+            <a href="#purpose">一、记录目的</a>
+            <a href="#runtime">二、Franka Panda 真机运行环境</a>
+            <a href="#gello-setup">三、GELLO 硬件与软件获取</a>
+            <a class="is-subitem" href="#python-env">(1) 安装 GELLO 前的 Python 环境</a>
+            <a class="is-subitem" href="#gello-install">(2) GELLO Python 包安装记录</a>
+            <a class="is-subitem" href="#serial-test">(3) 串口权限与 GELLO 读数测试</a>
+          </nav>
+        </aside>
+
+        <article class="post-body">
+        <header class="page-title">
+          <h1>Franka Panda 与 GELLO 遥操作配置记录</h1>
+          <p class="meta">Recording Note · 2026-06-17</p>
+        </header>
+
+        <h2 id="purpose">一、记录目的</h2>
+        <p>
+          本文记录 Franka Panda 真机控制环境与 GELLO 遥操作硬件的软件配置过程，目的是为后续模仿学习、强化学习和真机实验保留一份可复现的操作笔记。当前实验平台以 Ubuntu 20.04 和 ROS Noetic 为基础，底层控制主要依赖 Franka 官方 FCI/libfranka，Python 侧通过 pybind11 封装自定义 C++ 控制接口。
+        </p>
+        <p>
+          目前的总体目标不是直接采用 GELLO 官方仓库中完整的 ROS2 或 Polymetis 路线，而是将 GELLO 作为一个关节空间遥操作输入设备：Python 读取 GELLO 上 Dynamixel 电机的关节角，再将目标关节位置传入已有的 Franka pybind11 控制模块，由 C++/libfranka 负责实时控制。
+        </p>
+
+        <h2 id="runtime">二、Franka Panda 真机运行环境</h2>
+        <p>
+          Franka Panda 的真机运行需要先完成实时系统和底层控制库配置，具体可以<a href="https://frankarobotics.github.io/docs/doc/libfranka/docs/index.html" target="_blank" rel="noopener">参考官方文档</a>。整体流程如下：
+        </p>
+        <ol>
+          <li>在 Ubuntu 20.04 系统上配置实时内核，以满足 Franka FCI 对控制周期稳定性的要求。具体参考<a href="https://frankarobotics.github.io/docs/doc/libfranka/docs/real_time_kernel.html#" target="_blank" rel="noopener">官方的实时内核配置文档</a>。</li>
+          <li>安装与机器人系统版本匹配的 libfranka，并确认 Robot Server、Gripper Server 与 libfranka 版本兼容。</li>
+          <li>通过 C++ 调用 <code>&lt;franka&gt;</code> 相关接口，实现底层 1 kHz 实时控制回调。</li>
+          <li>基于 pybind11 对 C++ 控制器进行封装，使 Python 可以调用 Franka 控制接口。</li>
+          <li>Python 侧只负责高层目标更新，例如设置目标关节位置、读取当前机器人状态，不直接参与 1 kHz 实时控制循环。</li>
+        </ol>
+        <p>
+          当前采用的思路是：C++ 侧维护实时控制线程，并在 libfranka 控制回调中读取最近一次 Python 更新的目标关节量；Python 侧通过接口调用更新 <code>q_des</code>，避免在 Python 中执行实时控制循环。
+        </p>
+
+
+        <h2 id="gello-setup">三、GELLO 硬件与软件获取</h2>
+        <p>
+          为了采集示教数据，使用 GELLO 开源低成本遥操作机械臂硬件。这里提供我自己购买的<a href="https://e.tb.cn/h.RMT1wmtlp2REU2F?tk=xI4Vg56hXzU" target="_blank" rel="noopener">GELLO 开源机械臂淘宝链接</a>，以及GELLO的<a href="https://github.com/wuphilipp/gello_software" target="_blank" rel="noopener">开源软件仓库</a>。
+        </p>
+
+
+          <h3 id="python-env">(1) 安装 GELLO 前的 Python 环境</h3>
+          <p>
+            本项目使用 Miniconda 创建 <code>franka-il</code> 虚拟环境，用于后续
+            <code>libfranka</code> 的 Python 绑定、GELLO 遥操作测试以及模仿学习相关程序开发。
+          </p>
+
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">环境创建</span>
+            </div>
+            <pre><code>conda create -n franka-il python=3.9 pip -y
+conda activate franka-il</code></pre>
+          </div>
+
+          <p>
+            在安装 GELLO 相关依赖前，先导出当前环境配置，便于后续复现或回退：
+          </p>
+
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">环境备份</span>
+            </div>
+            <pre><code>conda env export &gt; franka-il-before-gello.yml</code></pre>
+          </div>
+
+          <p>
+            安装 GELLO 前，该环境的主要配置（可以运行franka机械臂的最小环境）记录如下：
+          </p>
+
+          <table class="note-table">
+            <thead>
+              <tr>
+                <th>项目</th>
+                <th>配置</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>环境名称</td>
+                <td><code>franka-il</code></td>
+              </tr>
+              <tr>
+                <td>Python 版本</td>
+                <td><code>3.9.25</code></td>
+              </tr>
+              <tr>
+                <td>环境路径</td>
+                <td><code>/home/franka-panda/miniconda3/envs/franka-il</code></td>
+              </tr>
+              <tr>
+                <td>核心数值库</td>
+                <td><code>numpy 2.0.2</code></td>
+              </tr>
+              <tr>
+                <td>Python/C++ 绑定</td>
+                <td><code>pybind11 3.0.3</code>，<code>pybind11-global 3.0.3</code></td>
+              </tr>
+              <tr>
+                <td>测试工具</td>
+                <td><code>pytest 8.4.1</code></td>
+              </tr>
+              <tr>
+                <td>基础构建工具</td>
+                <td><code>pip</code>、<code>setuptools</code>、<code>wheel</code></td>
+              </tr>
+            </tbody>
+          </table>
+
+
+          <h3 id="gello-install">(2) GELLO Python 包安装记录</h3>
+          <p>
+            参考 <a href="https://github.com/wuphilipp/gello_software" target="_blank" rel="noopener">GELLO 软件开源仓库</a>，
+            下载源码并在 <code>franka-il</code> 环境中安装。
+          </p>
+
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">源码下载</span>
+            </div>
+            <pre><code>cd /home/franka-panda/wzl/franka-im-learning
+git clone https://github.com/wuphilipp/gello_software.git
+cd gello_software</code></pre>
+          </div>
+
+          <p>
+            下载源码后，补充第三方依赖。仓库中包含 <code>DynamixelSDK</code> 和
+            <code>mujoco_menagerie</code> 等子模块：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">第三方库初始化</span>
+            </div>
+            <pre><code>git submodule update --init --recursive</code></pre>
+          </div>
+
+          <p>
+            随后安装 GELLO 所需的依赖，并安装 GELLO 包：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">最小安装</span>
+            </div>
+            <pre><code>/home/franka-panda/miniconda3/envs/franka-il/bin/python -m pip install -r requirements.txt
+/home/franka-panda/miniconda3/envs/franka-il/bin/python -m pip install third_party/DynamixelSDK/python
+/home/franka-panda/miniconda3/envs/franka-il/bin/python -m pip install .</code></pre>
+          </div>
+
+          <p>
+            这里对于我的环境和安装习惯来说，有两个问题：
+          </p>
+          <p>
+            首先，在 <code>Python 3.9</code> 的环境中，<code>pin==3.7.0</code> 存在版本问题，因此我在 <code>requirements.txt</code> 中将 <code>pin==3.7.0</code> 改为 <code>pin==2.7.0</code>，以及 <code>dm_control</code> 也存在版本问题，所以直接手动单独安装了相关包，在 <code>requirements.txt</code> 中将 <code>dm_control</code> 给注释了。单独安装的命令为：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">dm_control 安装</span>
+            </div>
+            <pre><code>/home/franka-panda/miniconda3/envs/franka-il/bin/python -m pip install mujoco==2.3.7
+/home/franka-panda/miniconda3/envs/franka-il/bin/python -m pip install dm_control==1.0.14</code></pre>
+          </div>
+          <p>
+            其次，由于开源代码中作者使用的是 <code>pip install -e .</code> 进行的包安装。这里的 <code>-e</code>，即 editable install，该模式不会把源码完整复制到环境的 <code>site-packages</code> 中，而是在当前 <code>Python</code> 环境中建立到源码目录的引用，因此运行时仍然直接使用项目 <code>/home/franka-panda/wzl/franka-im-learning/gello_software/gello/</code> 下的源码文件。然而，我个人不太喜欢软件包直接存在项目下，因此我使用 <code>pip install . </code>进行安装，即将源码完整复制到环境中，那么我就可以对项目下的源码进行删除或修改等等操作。但是，在这份开源代码中存在一个问题，<code>pip install . </code> 安装会根据 <code>setup.py</code> 中的 <code>setuptools.find_packages()</code>  构建安装包，并把识别到的 Python package 复制到 <code>site-packages</code>。  该仓库中部分子目录如 <code>gello/agents</code>、<code>gello/dynamixel</code>、  <code>gello/robots</code> 缺少 <code>__init__.py</code>，导致普通安装时这些子模块没有被打包进去。  因此安装后 <code>site-packages/gello/</code> 中只看到 <code>driver.py</code>，  导入时会出现 <code>ModuleNotFoundError: No module named 'gello.agents'</code> 这类找不到包的情况。
+          </p>
+
+          <p>
+            解决方法是在相关子目录中补充空的 <code>__init__.py</code> 文件，使其能够被
+            <code>setuptools.find_packages()</code> 正确识别，然后重新安装：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">修复普通安装</span>
+            </div>
+            <pre><code>cd /home/franka-panda/wzl/franka-im-learning/gello_software
+
+find gello -type d -exec touch {}/__init__.py \;
+
+/home/franka-panda/miniconda3/envs/franka-il/bin/python -m pip uninstall -y gello
+/home/franka-panda/miniconda3/envs/franka-il/bin/python -m pip install .</code></pre>
+          </div>
+
+          <p>
+            也可以使用作者推荐的 editable 安装方式。该方式直接引用源码目录，因此不会暴露上述普通安装时的子模块缺失问题。
+          </p>
+
+
+          <h3 id="serial-test">(3) 串口权限与 GELLO 读数测试</h3>
+          <p>
+            插入 GELLO 的 U2D2/USB 转串口后，系统识别到如下设备：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">查看串口设备</span>
+            </div>
+            <pre><code>ls /dev/serial/by-id/
+usb-FTDI_USB__-__Serial_Converter_FTC2NJ4R-if00-port0</code></pre>
+          </div>
+
+          <p>
+            完整串口路径为：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">text</span>
+              <span class="copy-hint">设备路径</span>
+            </div>
+            <pre><code>/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTC2NJ4R-if00-port0</code></pre>
+          </div>
+
+          <p>
+            首次打开串口时出现 <code>Permission denied</code>，需要将当前用户加入 <code>dialout</code> 组：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">串口权限</span>
+            </div>
+            <pre><code>sudo usermod -aG dialout $USER
+sudo reboot</code></pre>
+          </div>
+
+          <p>
+            重启后确认用户组：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">权限检查</span>
+            </div>
+            <pre><code>groups</code></pre>
+          </div>
+
+          <p>
+            最后运行 GELLO 读数测试脚本：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">读数测试</span>
+            </div>
+            <pre><code>cd /home/franka-panda/wzl/franka-im-learning
+/home/franka-panda/miniconda3/envs/franka-il/bin/python test_gello_read.py</code></pre>
+          </div>
+
+          <p>
+            具体的测试脚本 <code>test_gello_read.py</code> 如下。该脚本以约 50 Hz 的频率读取 GELLO 当前关节角度，并在终端中打印。
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">python</span>
+              <span class="copy-hint">test_gello_read.py</span>
+            </div>
+            <pre><code>import time
+import numpy as np
+
+from gello.agents.gello_agent import GelloAgent, DynamixelRobotConfig
+
+PORT = "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTC2NJ4R-if00-port0"
+
+config = DynamixelRobotConfig(
+  joint_ids=(1, 2, 3, 4, 5, 6, 7),
+  joint_offsets=(0, 0, 0, 0, 0, 0, 0),
+  joint_signs=(1, 1, 1, 1, 1, -1, 1),
+  gripper_config=None,
+)
+
+agent = GelloAgent(
+  port=PORT,
+  dynamixel_config=config,
+  start_joints=None,
+)
+
+while True:
+  q = agent.act({})
+  print(np.round(q, 3))
+  time.sleep(0.02)</code></pre>
+          </div>
+
+          <p>
+            运行该脚本后，终端能够持续刷新关节角度；手动转动 GELLO 关节时，对应数值同步变化，说明 Dynamixel 通信和 Python 读数流程已经基本跑通。
+          </p>
+
+
+
+        </article>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <span>© 2026 文泽凌 Wen Zeling</span>
+        <span><a href="../thoughts.html">返回学习思考</a></span>
+      </div>
+    </footer>
+    <script>
+      const tocToggle = document.querySelector(".post-toc-toggle");
+      const toc = document.querySelector(".post-toc");
+
+      if (tocToggle && toc) {
+        tocToggle.addEventListener("click", () => {
+          const isCollapsed = toc.classList.toggle("is-collapsed");
+          tocToggle.setAttribute("aria-expanded", String(!isCollapsed));
+          tocToggle.textContent = isCollapsed ? "展开" : "收起";
+        });
+      }
+    </script>
+  </body>
+</html>

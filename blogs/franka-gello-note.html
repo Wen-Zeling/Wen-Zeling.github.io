@@ -22,6 +22,8 @@
 
     <main class="page-main">
       <div class="container post-shell">
+
+
         <aside class="post-toc" aria-label="文章目录">
           <div class="post-toc-heading">
             <span class="post-toc-icon" aria-hidden="true"></span>
@@ -29,14 +31,19 @@
             <button class="post-toc-toggle" type="button" aria-expanded="true" aria-controls="post-toc-list">收起</button>
           </div>
           <nav id="post-toc-list" class="post-toc-list">
-            <a href="#purpose">一、记录目的</a>
-            <a href="#runtime">二、Franka Panda 真机运行环境</a>
-            <a href="#gello-setup">三、GELLO 硬件与软件获取</a>
+            <a href="#purpose">一、前言</a>
+            <a href="#experiment-video">二、机械臂实验视频</a>
+            <a href="#runtime">三、Franka Panda 真机运行环境</a>
+            <a href="#gello-setup">四、GELLO 硬件与软件</a>
             <a class="is-subitem" href="#python-env">(1) 安装 GELLO 前的 Python 环境</a>
             <a class="is-subitem" href="#gello-install">(2) GELLO Python 包安装记录</a>
             <a class="is-subitem" href="#serial-test">(3) 串口权限与 GELLO 读数测试</a>
+            <a href="#gello-mujoco">五、GELLO 遥操作 MuJoCo 中 Franka Panda 的配置与调试</a>
+            <a class="is-subitem" href="#mujoco-simulation">(1) MuJoCo Panda 仿真</a>
+            <a class="is-subitem" href="#mujoco-notes">(2) 注意事项</a>
           </nav>
         </aside>
+
 
         <article class="post-body">
         <header class="page-title">
@@ -44,7 +51,8 @@
           <p class="meta">Recording Note · 2026-06-17</p>
         </header>
 
-        <h2 id="purpose">一、记录目的</h2>
+
+        <h2 id="purpose">一、前言</h2>
         <p>
           本文记录 Franka Panda 真机控制环境与 GELLO 遥操作硬件的软件配置过程，目的是为后续模仿学习、强化学习和真机实验保留一份可复现的操作笔记。当前实验平台以 Ubuntu 20.04 和 ROS Noetic 为基础，底层控制主要依赖 Franka 官方 FCI/libfranka，Python 侧通过 pybind11 封装自定义 C++ 控制接口。
         </p>
@@ -52,7 +60,22 @@
           目前的总体目标不是直接采用 GELLO 官方仓库中完整的 ROS2 或 Polymetis 路线，而是将 GELLO 作为一个关节空间遥操作输入设备：Python 读取 GELLO 上 Dynamixel 电机的关节角，再将目标关节位置传入已有的 Franka pybind11 控制模块，由 C++/libfranka 负责实时控制。
         </p>
 
-        <h2 id="runtime">二、Franka Panda 真机运行环境</h2>
+        <h2 id="experiment-video">二、机械臂实验视频</h2>
+        <p>
+          视频一记录了连通实物 Franka Panda 进行控制与 GELLO 遥操作系统环境配置以及在 MuJoCo 中遥控 Franka 的过程。
+        </p>
+        <div class="bilibili-video">
+          <iframe
+            src="https://player.bilibili.com/player.html?bvid=BV1TyLd6yEaT&amp;p=1&amp;autoplay=0&amp;danmaku=0"
+            title="Franka Panda 与 GELLO 遥操作机械臂实验视频"
+            scrolling="no"
+            loading="lazy"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowfullscreen>
+          </iframe>
+        </div>
+
+        <h2 id="runtime">三、Franka Panda 真机运行环境</h2>
         <p>
           Franka Panda 的真机运行需要先完成实时系统和底层控制库配置，具体可以<a href="https://frankarobotics.github.io/docs/doc/libfranka/docs/index.html" target="_blank" rel="noopener">参考官方文档</a>。整体流程如下：
         </p>
@@ -68,7 +91,7 @@
         </p>
 
 
-        <h2 id="gello-setup">三、GELLO 硬件与软件获取</h2>
+        <h2 id="gello-setup">四、GELLO 硬件与软件</h2>
         <p>
           为了采集示教数据，使用 GELLO 开源低成本遥操作机械臂硬件。这里提供我自己购买的<a href="https://e.tb.cn/h.RMT1wmtlp2REU2F?tk=xI4Vg56hXzU" target="_blank" rel="noopener">GELLO 开源机械臂淘宝链接</a>，以及GELLO的<a href="https://github.com/wuphilipp/gello_software" target="_blank" rel="noopener">开源软件仓库</a>。
         </p>
@@ -90,7 +113,7 @@ conda activate franka-il</code></pre>
           </div>
 
           <p>
-            在安装 GELLO 相关依赖前，先导出当前环境配置，便于后续复现或回退：
+            在安装 GELLO 相关依赖前，先导出当前环境配置，便于后续复现或回退（我之前环境还安装了 <code>pybind11</code> 一些其他的包，没具体写）：
           </p>
 
           <div class="code-card">
@@ -147,8 +170,7 @@ conda activate franka-il</code></pre>
 
           <h3 id="gello-install">(2) GELLO Python 包安装记录</h3>
           <p>
-            参考 <a href="https://github.com/wuphilipp/gello_software" target="_blank" rel="noopener">GELLO 软件开源仓库</a>，
-            下载源码并在 <code>franka-il</code> 环境中安装。
+            参考 <a href="https://github.com/wuphilipp/gello_software" target="_blank" rel="noopener">GELLO 软件开源仓库</a>，下载源码并在 <code>franka-il</code> 环境中安装。
           </p>
 
           <div class="code-card">
@@ -162,8 +184,7 @@ cd gello_software</code></pre>
           </div>
 
           <p>
-            下载源码后，补充第三方依赖。仓库中包含 <code>DynamixelSDK</code> 和
-            <code>mujoco_menagerie</code> 等子模块：
+            下载源码后，补充第三方依赖。仓库中包含 <code>DynamixelSDK</code> 和 <code>mujoco_menagerie</code> 等子模块：
           </p>
           <div class="code-card">
             <div class="code-card-header">
@@ -322,6 +343,108 @@ while True:
           <p>
             运行该脚本后，终端能够持续刷新关节角度；手动转动 GELLO 关节时，对应数值同步变化，说明 Dynamixel 通信和 Python 读数流程已经基本跑通。
           </p>
+
+
+        <h2 id="gello-mujoco">五、GELLO 遥操作 MuJoCo 中 Franka Panda 的配置与调试</h2>
+        <p>
+          为确保安全，以及摸清楚 <code>GELLO</code> 遥操作相关的流程和原理，我先基于 <code>gello_software</code> 中提供的 <code>MuJoCo</code> 环境测试遥操作过程。实验过程如第二章中的视频一所示。<code>MuJoCo</code> 仿真模型使用 <a href="https://github.com/google-deepmind/mujoco_menagerie/tree/7f0684e0d2f6c9d75174d1a51e4924b7519119f9" target="_blank" rel="noopener">开源库 mujoco_menagerie</a> 中的 Franka Panda 模型。由于完整的 <code>mujoco_menagerie</code> 仓库较大，因此仅下载使用 Franka Panda 相关目录 <code>mujoco_menagerie/franka_emika_panda</code>。
+        </p>
+
+
+          <h3 id="mujoco-simulation">(1) MuJoCo Panda 仿真</h3>
+          <p>
+            为快速地在 <code>MuJoCo</code> 仿真环境中进行遥操作测试，这里我直接使用 <a href="https://github.com/wuphilipp/gello_software/tree/main/experiments" target="_blank" rel="noopener">gello_software/experiments</a> 下开源的代码。GELLO 遥操作 MuJoCo 中 Franka Panda 的过程并不是单个脚本直接完成，而是由两个主要进程 <code>gello_software/experiments/launch_nodes.py</code> 和 <code>gello_software/experiments/run_env.py</code> 协同工作。
+          </p>
+          <p>
+            第一个进程 <code>launch_nodes.py</code> 负责维护机器人对象。对于当前任务，它加载 MuJoCo 中的 Franka Panda 模型，启动 MuJoCo viewer，并持续推进仿真物理世界。同时，它还启动一个 <code>ZMQ server</code>，对外提供机器人接口，例如读取关节状态、接收关节命令、返回观测信息等。
+          </p>
+          <p>
+            第二个进程 <code>run_env.py</code> 负责控制逻辑。它通过 <code>ZMQ client</code> 连接到第一个进程中的机器人服务端，然后创建控制环境 RobotEnv 和控制器 Agent。当使用 GELLO 遥操作时，Agent 就是 GelloAgent，负责从 GELLO 的 Dynamixel 电机读取当前关节角，并将其转换成 Panda 的目标关节角。
+          </p>
+          <p>
+            为了方便，我直接 copy 到了我自己项目下进行使用和修改。使用两个终端分别启动进程即可：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">启动 launch_nodes.py</span>
+            </div>
+            <pre><code>cd /home/franka-panda/wzl/franka-im-learning
+/home/franka-panda/miniconda3/envs/franka-il/bin/python /home/franka-panda/wzl/franka-im-learning/launch_nodes.py --robot sim_panda</code></pre>
+          </div>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">启动 run_env.py</span>
+            </div>
+            <pre><code>cd /home/franka-panda/wzl/franka-im-learning
+/home/franka-panda/miniconda3/envs/franka-il/bin/python /home/franka-panda/wzl/franka-im-learning/run_env.py   --agent gello   --gello-port /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTC2NJ4R-if00-port0   --start-joints 0 0 0 -1.57 0 1.57 0 0   --hz 50</code></pre>
+          </div>
+
+
+          <h3 id="mujoco-notes">(2) 注意事项</h3>
+          <p>
+            首先，开源代码 <code>gello_agent.py</code> 中缺少 franka panda 的配置，需要自己添加进去。如果在安装 gello 包的时候是 <code>pip install .</code> 进行安装的，到相关环境中进行更改，如我的是 <code>/home/franka-panda/miniconda3/envs/franka-il/lib/python3.9/site-packages/gello/agents/gello_agent.py</code> ；如果是 <code>pip install -e .</code> 进行安装的，直接下载源码中进行修改就行。具体是在 <code># Right UR</code> 后面添加这段：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">python</span>
+              <span class="copy-hint">添加 franka panda 的配置</span>
+            </div>
+            <pre><code>    # franka-panda
+    "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTC2NJ4R-if00-port0": DynamixelRobotConfig(
+        joint_ids=(1, 2, 3, 4, 5, 6, 7),
+        joint_offsets=(
+            0 * np.pi,
+            np.pi,
+            np.pi,
+            np.pi,
+            np.pi,
+            np.pi,
+            np.pi,
+        ),
+        joint_signs=(1, 1, 1, 1, 1, -1, 1),
+        gripper_config=(8, 200.981640625, 159.181640625),
+    ),</code></pre>
+          </div>
+          <p>
+            其次，添加的具体 <code>joint_offsets</code> 数据需要在初始构型下进行标定：
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">标定脚本</span>
+            </div>
+            <pre><code>/home/franka-panda/miniconda3/envs/franka-il/bin/python /home/franka-panda/wzl/franka-im-learning/gello_get_offset.py --start-joints 0 0 0 -1.57 0 1.57 0   --joint-signs 1 1 1 1 1 -1 1 --port /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTC2NJ4R-if00-port0</code></pre>
+          </div>
+          <p>
+            将输出的数据填入 <code># franka-panda</code> 的配置中。
+          </p>
+          <div class="code-card">
+            <div class="code-card-header">
+              <span class="code-lang">bash</span>
+              <span class="copy-hint">标定数据</span>
+            </div>
+            <pre><code>Attempting to initialize Dynamixel driver (attempt 1/3)
+Successfully initialized Dynamixel driver on /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTC2NJ4R-if00-port0
+
+best offsets               :  ['0.000', '3.142', '3.142', '3.142', '3.142', '3.142', '3.142']
+best offsets function of pi: [0*np.pi/2, 2*np.pi/2, 2*np.pi/2, 2*np.pi/2, 2*np.pi/2, 2*np.pi/2, 2*np.pi/2 ]
+gripper open (degrees)        201.333203125
+gripper close (degrees)       159.533203125</code></pre>
+          </div>
+          <p>
+            下图是我标定的初始构型，应该是这样吧...！
+          </p>
+          <figure class="post-figure">
+            <img
+              src="../assets/images/blogs/franka-gello-note/gello-initial-configuration.jpg"
+              alt="GELLO 遥操作臂标定时的初始构型"
+              loading="lazy"
+              decoding="async">
+            <figcaption>图1 GELLO 遥操作臂标定时的初始构型</figcaption>
+          </figure>
+
 
 
 

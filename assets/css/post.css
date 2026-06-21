@@ -39,6 +39,9 @@
 
 .post-body p {
   color: var(--color-muted);
+  text-align: justify;
+  text-align-last: left;
+  text-justify: inter-character;
 }
 
 .post-body :not(pre) > code {
